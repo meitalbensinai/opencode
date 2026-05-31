@@ -15,7 +15,7 @@
 // The tick counter prevents stale idle events from resolving the wrong turn.
 // We also re-check live session status before resolving an idle event so a
 // delayed idle from an older turn cannot complete a newer busy turn.
-import type { Event, GlobalEvent, OpencodeClient } from "@opencode-ai/sdk/v2"
+import type { Event, OpencodeClient } from "@opencode-ai/sdk/v2"
 import { Context, Deferred, Effect, Exit, Layer, Scope, Stream } from "effect"
 import { makeRuntime } from "@/effect/run-service"
 import {
@@ -60,6 +60,13 @@ import type {
 
 type Trace = {
   write(type: string, data?: unknown): void
+}
+
+type GlobalEventLike = {
+  directory?: string
+  payload?: {
+    type?: string
+  }
 }
 
 const StreamClosed = undefined as never
@@ -160,7 +167,7 @@ function isEvent(value: unknown): value is Event {
   return typeof type === "string" && !!properties && typeof properties === "object"
 }
 
-function isGlobalEvent(value: unknown): value is GlobalEvent {
+function isGlobalEvent(value: unknown): value is GlobalEventLike {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return false
   }
@@ -175,7 +182,7 @@ function globalPayloadEvent(value: unknown): Event | undefined {
   }
 
   const payload = value.payload
-  if (payload.type === "sync") {
+  if (!payload || payload.type === "sync") {
     return undefined
   }
 
@@ -191,7 +198,7 @@ function isMatchingDisposeEvent(value: unknown, directory: string | undefined): 
     return false
   }
 
-  return value.payload.type === "server.instance.disposed"
+  return value.payload?.type === "global.disposed"
 }
 
 function active(event: Event, sessionID: string): boolean {
